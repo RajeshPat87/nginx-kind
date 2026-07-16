@@ -43,6 +43,7 @@ kubectl get nodes
 # NAME                        STATUS   ROLES           AGE   VERSION
 # nginx-kind-control-plane    Ready    control-plane   1m    v1.3x
 # nginx-kind-worker           Ready    <none>          1m    v1.3x
+# nginx-kind-worker2          Ready    <none>          1m    v1.3x
 ```
 
 ---
@@ -187,6 +188,67 @@ Password=`apppass123`, DB=`appdb`.
 curl -s -o /dev/null -w "%{http_code}\n" --resolve nope.example.com:80:127.0.0.1 http://nope.example.com/
 ```
 Expect `404` from the default backend (no rule matched).
+
+---
+
+## 5.10 Ingress controller High Availability (MetalLB LoadBalancer)
+
+The 9 scenarios above run a **single** controller replica on the control-plane
+node, bound to `localhost:80/443` via hostPort. That is deliberate for simple
+local access — but it is *not* the HA topology from the usecase diagram
+(*External LoadBalancer → Replica 1 / 2 / N → Services → Pods*).
+
+HA is available as a **toggle** that switches the controller to multiple
+replicas behind a real LoadBalancer, without disturbing the default path.
+
+**What flips when `ingress_ha_enabled=true`:**
+
+| | Default | HA mode |
+|---|---|---|
+| Replicas | 1 | `ingress_replica_count` (default 2) |
+| Scheduling | pinned to control-plane | one per worker (required pod anti-affinity) |
+| Service type | NodePort + hostPort | `LoadBalancer` (IP from MetalLB) |
+| Reached via | `localhost:80` | the MetalLB LoadBalancer IP |
+
+```bash
+# The cluster must already have 2 workers (kind/cluster.yaml). If you built it
+# before this change, recreate it:  make down && make cluster
+
+# Enable HA and apply. MetalLB is installed automatically when this is set.
+terraform -chdir=terraform apply -auto-approve \
+  -var ingress_ha_enabled=true -var ingress_replica_count=2
+
+# Two controller replicas, one per worker:
+kubectl -n ingress-nginx get pods -o wide -l app.kubernetes.io/component=controller
+
+# The Service is now type LoadBalancer with an EXTERNAL-IP from the pool:
+kubectl -n ingress-nginx get svc ingress-nginx-controller
+
+# Grab the assigned IP and exercise the same scenarios against it:
+LB_IP="$(terraform -chdir=terraform output -raw ingress_external_ip)"
+echo "ingress LoadBalancer IP: $LB_IP"
+INGRESS_IP="$LB_IP" ./scripts/test-scenarios.sh
+
+# Prove HA: delete one replica and watch traffic keep flowing while it reschedules.
+kubectl -n ingress-nginx delete pod -l app.kubernetes.io/component=controller --field-selector=status.phase=Running --wait=false | head -1
+curl -s --resolve app.example.com:80:$LB_IP http://app.example.com/app1 | grep Hostname
+```
+
+> **Address pool:** `metallb_address_pool` must sit inside the kind Docker
+> network subnet. Verify with
+> `docker network inspect kind -f '{{ (index .IPAM.Config 0).Subnet }}'`
+> (kind defaults to `172.18.0.0/16`) and override the var if yours differs.
+>
+> **WSL2 note:** the LoadBalancer IP lives on the kind Docker bridge. It is
+> reachable from inside the WSL2 VM (where you run these commands). To reach it
+> from a Windows browser you would route to the WSL2/Docker network — the
+> default `localhost` path (HA disabled) is simpler for browser testing.
+
+Return to the default single-replica setup any time:
+
+```bash
+terraform -chdir=terraform apply -auto-approve -var ingress_ha_enabled=false
+```
 
 ---
 

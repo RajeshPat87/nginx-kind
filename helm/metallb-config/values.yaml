@@ -1,0 +1,6 @@
+# Range MetalLB may hand out to LoadBalancer Services. It MUST sit inside the
+# kind Docker network subnet, otherwise the assigned IP is unreachable.
+# Check the subnet with:
+#   docker network inspect kind -f '{{ (index .IPAM.Config 0).Subnet }}'
+# kind defaults to 172.18.0.0/16, so the tail end of that range is safe.
+addressPool: 172.18.255.200-172.18.255.250

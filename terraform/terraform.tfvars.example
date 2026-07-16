@@ -5,3 +5,14 @@
 # pg_user           = "appuser"
 # pg_password       = "apppass123"
 # pg_database       = "appdb"
+
+# ---- Ingress HA use-case (MetalLB LoadBalancer + multiple replicas) ----
+# Leave false for the default single-replica setup reachable on localhost:80.
+# Set true to demo HA: 2 controller replicas spread across the 2 workers behind
+# a MetalLB LoadBalancer. Access is then via the assigned LB IP, not localhost.
+# ingress_ha_enabled    = false
+# ingress_replica_count = 2
+# metallb_chart_version = "0.14.8"
+# Must match the kind Docker network subnet:
+#   docker network inspect kind -f '{{ (index .IPAM.Config 0).Subnet }}'
+# metallb_address_pool  = "172.18.255.200-172.18.255.250"

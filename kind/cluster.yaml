@@ -1,8 +1,16 @@
 # kind cluster for the nginx-ingress lab.
-# - control-plane is labeled ingress-ready so ingress-nginx schedules here.
-# - host ports 80/443 are mapped into the control-plane node so the ingress
-#   controller (running with hostPort) is reachable from the host as localhost.
-# - one worker gives backend pods a second node to spread across (HA demo).
+#
+# Two access patterns are supported by the same cluster:
+#
+#  1. Default (single-replica) — the ingress controller runs with hostPort on
+#     the control-plane node. control-plane is labeled ingress-ready so it
+#     schedules there, and host ports 80/443 are mapped in so the controller is
+#     reachable from the host as localhost. This backs the 9 baseline usecases.
+#
+#  2. HA (ingress_ha_enabled=true) — the controller runs 2 replicas spread
+#     across the two workers via pod anti-affinity, behind a MetalLB
+#     LoadBalancer Service (no hostPort). Two workers give the two replicas a
+#     node each. This backs the "Ingress Controller High Availability" usecase.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: nginx-kind
@@ -21,4 +29,7 @@ nodes:
       - containerPort: 443
         hostPort: 443
         protocol: TCP
+  # Two workers: backends spread across nodes, and in HA mode the two ingress
+  # controller replicas land one-per-worker via pod anti-affinity.
+  - role: worker
   - role: worker

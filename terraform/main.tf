@@ -7,14 +7,26 @@ module "monitoring" {
   chart_version = var.monitoring_chart_version
 }
 
+# MetalLB provides a real LoadBalancer implementation for the HA ingress
+# use-case. Skipped entirely (count = 0) when ingress_ha_enabled is false.
+module "loadbalancer" {
+  source        = "./modules/loadbalancer"
+  enabled       = var.ingress_ha_enabled
+  chart_version = var.metallb_chart_version
+  address_pool  = var.metallb_address_pool
+}
+
 module "ingress" {
   source                 = "./modules/ingress"
   chart_version          = var.ingress_chart_version
   enable_service_monitor = var.enable_monitoring
+  ha_enabled             = var.ingress_ha_enabled
+  replica_count          = var.ingress_replica_count
 
   # The ingress chart renders a ServiceMonitor whose CRD is provided by the
-  # monitoring stack, so that must be installed first.
-  depends_on = [module.monitoring]
+  # monitoring stack, so that must be installed first. In HA mode the
+  # controller's LoadBalancer Service needs MetalLB ready to assign an IP.
+  depends_on = [module.monitoring, module.loadbalancer]
 }
 
 module "database" {

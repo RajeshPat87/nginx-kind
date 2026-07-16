@@ -35,6 +35,31 @@ variable "ingress_chart_version" {
   default     = "4.11.3"
 }
 
+# ---- ingress HA (MetalLB LoadBalancer + multiple controller replicas) ----
+variable "ingress_ha_enabled" {
+  description = "Run ingress-nginx in HA mode: multiple replicas behind a MetalLB LoadBalancer. Default (false) keeps the single hostPort replica reachable on localhost."
+  type        = bool
+  default     = false
+}
+
+variable "ingress_replica_count" {
+  description = "Controller replicas when ingress_ha_enabled=true. Keep <= worker count (one replica per node)."
+  type        = number
+  default     = 2
+}
+
+variable "metallb_chart_version" {
+  description = "MetalLB Helm chart version (only used when ingress_ha_enabled=true)."
+  type        = string
+  default     = "0.14.8"
+}
+
+variable "metallb_address_pool" {
+  description = "IP range MetalLB assigns to LoadBalancer Services. Must be inside the kind Docker network subnet (docker network inspect kind)."
+  type        = string
+  default     = "172.18.255.200-172.18.255.250"
+}
+
 # ---- PostgreSQL ----
 variable "pg_user" {
   description = "PostgreSQL application username."
