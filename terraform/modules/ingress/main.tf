@@ -55,12 +55,45 @@ locals {
   }
 
   # HA: N replicas spread one-per-node via required pod anti-affinity, behind a
-  # MetalLB LoadBalancer Service (no hostPort, no control-plane pinning). This
-  # is the "Ingress Controller High Availability" usecase from the diagram.
+  # MetalLB LoadBalancer Service. This is the "Ingress Controller High
+  # Availability" usecase from the diagram.
+  #
+  # The control-plane toleration + hostPort are what keep the lab reachable on
+  # localhost in this mode. kind maps host 80/443 into the control-plane node
+  # only, so with replicas confined to the workers nothing answers on
+  # localhost:80 and every demo host breaks for a browser on the host. Allowing
+  # one replica onto the control-plane (replica_count = node count) restores
+  # that path. The MetalLB LoadBalancer IP keeps working either way — hostPort
+  # is a container-level setting and is independent of the Service type.
   controller_ha = {
     replicaCount   = var.replica_count
     service        = { type = "LoadBalancer" }
     publishService = { enabled = true }
+    tolerations = [
+      {
+        key      = "node-role.kubernetes.io/control-plane"
+        operator = "Equal"
+        effect   = "NoSchedule"
+      }
+    ]
+    hostPort = {
+      enabled = true
+      ports   = { http = 80, https = 443 }
+    }
+    # One pod per node + required anti-affinity means a rollout cannot surge:
+    # there is no spare node for an extra replica, and the hostPort is already
+    # held by the outgoing pod on that node. The chart default (maxSurge 25%,
+    # maxUnavailable 25%) rounds maxUnavailable down to 0 at 3 replicas, so the
+    # rollout deadlocks — it may not remove an old pod, and the new one it adds
+    # can never be scheduled. Replace-in-place instead: 2 of 3 replicas stay
+    # serving through the roll.
+    updateStrategy = {
+      type = "RollingUpdate"
+      rollingUpdate = {
+        maxSurge       = 0
+        maxUnavailable = 1
+      }
+    }
     affinity = {
       podAntiAffinity = {
         requiredDuringSchedulingIgnoredDuringExecution = [

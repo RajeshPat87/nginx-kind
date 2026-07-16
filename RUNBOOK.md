@@ -205,10 +205,20 @@ replicas behind a real LoadBalancer, without disturbing the default path.
 
 | | Default | HA mode |
 |---|---|---|
-| Replicas | 1 | `ingress_replica_count` (default 2) |
-| Scheduling | pinned to control-plane | one per worker (required pod anti-affinity) |
-| Service type | NodePort + hostPort | `LoadBalancer` (IP from MetalLB) |
-| Reached via | `localhost:80` | the MetalLB LoadBalancer IP |
+| Replicas | 1 | `ingress_replica_count` (3 = one per node) |
+| Scheduling | pinned to control-plane | one per node (required pod anti-affinity) |
+| Service type | NodePort + hostPort | `LoadBalancer` (MetalLB) + hostPort |
+| Reached via | `localhost:80` | `localhost:80` *and* the MetalLB IP |
+
+Both modes stay reachable on `localhost:80`, because HA mode keeps `hostPort`
+and tolerates the control-plane taint so one replica still lands there. kind
+maps host 80/443 into the control-plane node only, so a replica has to be
+running there or nothing answers on localhost — the LoadBalancer IP alone is
+not enough, since it is unreachable from Windows.
+
+`ingress_replica_count` should equal the node count. The anti-affinity is
+required-during-scheduling, so extra replicas beyond one-per-node sit `Pending`
+forever.
 
 ```bash
 # The cluster must already have 2 workers (kind/cluster.yaml). If you built it
@@ -216,9 +226,9 @@ replicas behind a real LoadBalancer, without disturbing the default path.
 
 # Enable HA and apply. MetalLB is installed automatically when this is set.
 terraform -chdir=terraform apply -auto-approve \
-  -var ingress_ha_enabled=true -var ingress_replica_count=2
+  -var ingress_ha_enabled=true -var ingress_replica_count=3
 
-# Two controller replicas, one per worker:
+# Three controller replicas, one per node:
 kubectl -n ingress-nginx get pods -o wide -l app.kubernetes.io/component=controller
 
 # The Service is now type LoadBalancer with an EXTERNAL-IP from the pool:
@@ -269,9 +279,12 @@ EOF
 Then browse `http://app.example.com/app1`, `https://secure.example.com`
 (accept the self-signed cert), `http://db.example.com`, etc.
 
-> **WSL2 note:** these run inside the WSL2 VM. From a Windows browser use the
-> WSL2 IP (`ip addr show eth0`) instead of `127.0.0.1`, or run the browser
-> inside WSL. From a WSL2 terminal, `127.0.0.1` works as shown.
+> **WSL2 note:** `127.0.0.1` works from a Windows browser too — WSL forwards
+> Windows' localhost into the VM, where kind publishes ports 80/443. Add the
+> same entries to the Windows hosts file (`C:\Windows\System32\drivers\etc\hosts`,
+> needs an elevated editor), still pointing at `127.0.0.1`. Do not use the WSL2
+> `eth0` IP or the ingress LoadBalancer IP there: the first changes on restart,
+> and the second is a Docker bridge address Windows cannot route to.
 
 ---
 
@@ -289,17 +302,20 @@ Grafana is also exposed through the nginx ingress at **`grafana.example.com`**
 port-forward and survives Grafana pod restarts. `terraform output grafana_url`
 prints the URL.
 
-- **Default (`hostPort`) mode** — add `grafana.example.com` to your hosts file
-  pointing at `127.0.0.1` (same as the app hosts below) and browse
-  `http://grafana.example.com`.
-- **HA mode** — resolve it to the ingress LoadBalancer IP instead:
-  ```bash
-  LB_IP="$(terraform -chdir=terraform output -raw ingress_external_ip)"
-  curl -s -o /dev/null -w "%{http_code}\n" --resolve grafana.example.com:80:$LB_IP http://grafana.example.com/api/health   # 200
-  # WSL2 /etc/hosts for a Linux browser:  echo "$LB_IP grafana.example.com" | sudo tee -a /etc/hosts
-  ```
-  From a Windows browser the LB IP must be routable (WSL2 mirrored networking);
-  otherwise use `make grafana` (port-forward) for Windows.
+`127.0.0.1` is the answer in **both** modes — point `grafana.example.com` at it
+in your hosts file, exactly like the app hosts above, and browse
+`http://grafana.example.com`. No port-forward, no per-mode difference.
+
+In HA mode the ingress LoadBalancer IP works as well, but only from *inside*
+WSL2 — it is a Docker bridge address and is not routable from Windows:
+
+```bash
+LB_IP="$(terraform -chdir=terraform output -raw ingress_external_ip)"
+curl -s -o /dev/null -w "%{http_code}\n" --resolve grafana.example.com:80:$LB_IP http://grafana.example.com/api/health   # 200 from WSL, times out from Windows
+```
+
+> Don't put the LoadBalancer IP in the Windows hosts file — mirrored networking
+> does not make it routable. Use `127.0.0.1`.
 
 Prometheus (raw queries / targets) is reachable the same way via port-forward:
 ```bash
