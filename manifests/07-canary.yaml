@@ -1,0 +1,46 @@
+# USE CASE 7: Canary / weighted traffic splitting (progressive delivery + HA).
+# Two Ingresses share host canary.example.com:
+#   - the stable one serves the baseline (canary-stable, 2 replicas)
+#   - the canary one (canary-weight: 30) sends ~30% of traffic to canary-canary
+# whoami's "Name"/"Hostname" fields reveal which pool answered each request.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary-stable
+  namespace: apps
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: canary-stable
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary-canary
+  namespace: apps
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "30"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: canary.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: canary-canary
+                port:
+                  number: 80

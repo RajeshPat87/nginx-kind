@@ -1,0 +1,24 @@
+# kind cluster for the nginx-ingress lab.
+# - control-plane is labeled ingress-ready so ingress-nginx schedules here.
+# - host ports 80/443 are mapped into the control-plane node so the ingress
+#   controller (running with hostPort) is reachable from the host as localhost.
+# - one worker gives backend pods a second node to spread across (HA demo).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: nginx-kind
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+  - role: worker

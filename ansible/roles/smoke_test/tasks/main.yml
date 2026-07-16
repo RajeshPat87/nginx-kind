@@ -1,0 +1,43 @@
+---
+# Minimal reachability check so `make config` fails loudly if the data path is
+# broken. The full scenario matrix lives in scripts/test-scenarios.sh (make test).
+- name: Path routing returns 200 for /app1
+  ansible.builtin.command:
+    cmd: >-
+      curl -s -o /dev/null -w "%{http_code}"
+      --resolve app.example.com:80:127.0.0.1
+      http://app.example.com/app1
+  register: smoke_path
+  changed_when: false
+  retries: 5
+  delay: 5
+  until: smoke_path.stdout == "200"
+
+- name: TLS host returns 200 over HTTPS
+  ansible.builtin.command:
+    cmd: >-
+      curl -sk -o /dev/null -w "%{http_code}"
+      --resolve secure.example.com:443:127.0.0.1
+      https://secure.example.com/
+  register: smoke_tls
+  changed_when: false
+  retries: 5
+  delay: 5
+  until: smoke_tls.stdout == "200"
+
+- name: Basic-auth host returns 401 without credentials
+  ansible.builtin.command:
+    cmd: >-
+      curl -s -o /dev/null -w "%{http_code}"
+      --resolve auth.example.com:80:127.0.0.1
+      http://auth.example.com/
+  register: smoke_auth
+  changed_when: false
+  failed_when: smoke_auth.stdout != "401"
+
+- name: Smoke test summary
+  ansible.builtin.debug:
+    msg:
+      - "path routing (/app1): {{ smoke_path.stdout }}"
+      - "tls (https):          {{ smoke_tls.stdout }}"
+      - "basic-auth (no creds): {{ smoke_auth.stdout }}"

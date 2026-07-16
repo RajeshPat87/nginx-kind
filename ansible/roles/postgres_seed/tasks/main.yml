@@ -1,0 +1,35 @@
+---
+- name: Wait for PostgreSQL to be ready
+  ansible.builtin.command:
+    cmd: "{{ kubectl }} -n {{ data_namespace }} rollout status statefulset/postgres --timeout=180s"
+  changed_when: false
+
+- name: Create and seed a demo table (idempotent)
+  ansible.builtin.shell:
+    cmd: |
+      {{ kubectl }} -n {{ data_namespace }} exec -i statefulset/postgres -- \
+        env PGPASSWORD='{{ pg_password }}' psql -U {{ pg_user }} -d {{ pg_database }} -v ON_ERROR_STOP=1 <<'SQL'
+      CREATE TABLE IF NOT EXISTS visitors (
+        id      SERIAL PRIMARY KEY,
+        name    TEXT NOT NULL,
+        seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      INSERT INTO visitors (name)
+      SELECT 'demo-seed'
+      WHERE NOT EXISTS (SELECT 1 FROM visitors);
+      SQL
+  register: seed_result
+  changed_when: "'INSERT 0 1' in seed_result.stdout"
+
+- name: Verify seeded rows
+  ansible.builtin.command:
+    cmd: >-
+      {{ kubectl }} -n {{ data_namespace }} exec statefulset/postgres --
+      env PGPASSWORD={{ pg_password }} psql -U {{ pg_user }} -d {{ pg_database }}
+      -t -c "SELECT count(*) FROM visitors;"
+  register: row_count
+  changed_when: false
+
+- name: PostgreSQL seed summary
+  ansible.builtin.debug:
+    msg: "visitors table row count: {{ row_count.stdout | trim }}"

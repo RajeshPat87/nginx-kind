@@ -1,0 +1,48 @@
+---
+# Post-configuration for the nginx-kind lab. Terraform builds the cluster
+# workloads; Ansible wires up the "day-2" bits that depend on secrets and data:
+#   1. tls          - self-signed cert -> demo-tls Secret
+#   2. basic_auth    - htpasswd -> basic-auth Secret
+#   3. ingress_rules - apply every ingress use-case manifest
+#   4. postgres_seed - create/seed a demo table in PostgreSQL
+#   5. smoke_test    - quick reachability check through the ingress
+- name: nginx-kind post configuration
+  hosts: local
+  gather_facts: false
+
+  vars:
+    kube_context: kind-nginx-kind
+    kubectl: "kubectl --context kind-nginx-kind"
+    apps_namespace: apps
+    data_namespace: data
+    domain: example.com
+    manifests_dir: "{{ playbook_dir }}/../manifests"
+    workdir: "{{ playbook_dir }}/.work"
+
+    tls_secret: demo-tls
+    tls_hosts:
+      - app.example.com
+      - shop.example.com
+      - api.example.com
+      - blog.example.com
+      - secure.example.com
+      - rewrite.example.com
+      - ratelimit.example.com
+      - auth.example.com
+      - canary.example.com
+      - db.example.com
+
+    basic_auth_secret: basic-auth
+    basic_auth_user: admin
+    basic_auth_password: secret123
+
+    pg_user: appuser
+    pg_password: apppass123
+    pg_database: appdb
+
+  roles:
+    - tls
+    - basic_auth
+    - ingress_rules
+    - postgres_seed
+    - smoke_test

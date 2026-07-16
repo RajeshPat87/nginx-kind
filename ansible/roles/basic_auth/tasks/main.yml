@@ -1,0 +1,30 @@
+---
+- name: Ensure work directory exists
+  ansible.builtin.file:
+    path: "{{ workdir }}"
+    state: directory
+    mode: "0700"
+
+# Generate an htpasswd line without needing apache2-utils: openssl produces the
+# apr1 (Apache MD5) hash that nginx basic-auth understands.
+- name: Generate apr1 password hash
+  ansible.builtin.command:
+    cmd: "openssl passwd -apr1 {{ basic_auth_password }}"
+  register: apr1_hash
+  changed_when: false
+
+- name: Write htpasswd file
+  ansible.builtin.copy:
+    dest: "{{ workdir }}/auth"
+    content: "{{ basic_auth_user }}:{{ apr1_hash.stdout }}\n"
+    mode: "0600"
+
+- name: Create/update the basic-auth secret in the apps namespace
+  ansible.builtin.shell:
+    cmd: >-
+      {{ kubectl }} create secret generic {{ basic_auth_secret }}
+      --from-file=auth={{ workdir }}/auth
+      -n {{ apps_namespace }} --dry-run=client -o yaml
+      | {{ kubectl }} apply -f -
+  register: auth_secret_result
+  changed_when: "'configured' in auth_secret_result.stdout or 'created' in auth_secret_result.stdout"

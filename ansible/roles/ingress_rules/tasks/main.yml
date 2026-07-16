@@ -1,0 +1,23 @@
+---
+- name: Wait for the ingress-nginx admission webhook to be ready
+  ansible.builtin.command:
+    cmd: >-
+      {{ kubectl }} -n ingress-nginx wait --for=condition=ready pod
+      -l app.kubernetes.io/component=controller --timeout=180s
+  changed_when: false
+
+- name: Apply all ingress use-case manifests
+  ansible.builtin.command:
+    cmd: "{{ kubectl }} apply -f {{ manifests_dir }}/"
+  register: apply_result
+  changed_when: "'configured' in apply_result.stdout or 'created' in apply_result.stdout"
+
+- name: Show applied ingresses
+  ansible.builtin.command:
+    cmd: "{{ kubectl }} -n {{ apps_namespace }} get ingress"
+  register: ingress_list
+  changed_when: false
+
+- name: Ingress summary
+  ansible.builtin.debug:
+    var: ingress_list.stdout_lines

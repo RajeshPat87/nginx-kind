@@ -1,0 +1,17 @@
+# Python venv (ansible)
+.venv/
+
+# Ansible work dir (generated certs/htpasswd)
+ansible/.work/
+*.retry
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+terraform/terraform.tfvars
+
+# misc
+__pycache__/
+*.pyc

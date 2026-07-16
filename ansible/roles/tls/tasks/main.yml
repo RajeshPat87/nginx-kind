@@ -1,0 +1,29 @@
+---
+- name: Ensure work directory exists
+  ansible.builtin.file:
+    path: "{{ workdir }}"
+    state: directory
+    mode: "0700"
+
+- name: Build subjectAltName string from tls_hosts
+  ansible.builtin.set_fact:
+    tls_san: "{{ tls_hosts | map('regex_replace', '^(.*)$', 'DNS:\\1') | join(',') }}"
+
+- name: Generate self-signed certificate covering all demo hosts
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -nodes -newkey rsa:2048 -days 365
+      -keyout {{ workdir }}/tls.key -out {{ workdir }}/tls.crt
+      -subj "/CN=nginx-kind-demo"
+      -addext "subjectAltName={{ tls_san }}"
+    creates: "{{ workdir }}/tls.crt"
+
+- name: Create/update the TLS secret in the apps namespace
+  ansible.builtin.shell:
+    cmd: >-
+      {{ kubectl }} create secret tls {{ tls_secret }}
+      --cert={{ workdir }}/tls.crt --key={{ workdir }}/tls.key
+      -n {{ apps_namespace }} --dry-run=client -o yaml
+      | {{ kubectl }} apply -f -
+  register: tls_secret_result
+  changed_when: "'configured' in tls_secret_result.stdout or 'created' in tls_secret_result.stdout"

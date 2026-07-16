@@ -1,0 +1,29 @@
+# USE CASE 1: Path-based (fan-out) routing.
+# One host, different paths route to different Services.
+#   http://app.example.com/app1  -> app1
+#   http://app.example.com/app2  -> app2
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-routing
+  namespace: apps
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /app1
+            pathType: Prefix
+            backend:
+              service:
+                name: app1
+                port:
+                  number: 80
+          - path: /app2
+            pathType: Prefix
+            backend:
+              service:
+                name: app2
+                port:
+                  number: 80

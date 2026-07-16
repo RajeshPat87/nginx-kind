@@ -1,0 +1,28 @@
+# USE CASE 3: TLS termination.
+# The controller terminates HTTPS using the cert/key in the `demo-tls` Secret
+# (created by the Ansible tls role) and proxies plain HTTP to the backend.
+#   https://secure.example.com -> app1
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tls-app
+  namespace: apps
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - secure.example.com
+      secretName: demo-tls
+  rules:
+    - host: secure.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app1
+                port:
+                  number: 80

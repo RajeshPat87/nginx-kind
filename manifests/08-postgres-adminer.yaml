@@ -1,0 +1,25 @@
+# USE CASE 8: Ingress in front of a real DB-backed app.
+# Adminer (a DB web client) is exposed through the ingress and talks to the
+# PostgreSQL Service, demonstrating the full data path:
+#   http://db.example.com -> adminer (Service) -> pod -> postgres.data Service
+# Body size bumped so Adminer's SQL import form works.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: adminer
+  namespace: apps
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: db.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: adminer
+                port:
+                  number: 8080

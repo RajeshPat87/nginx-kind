@@ -1,0 +1,22 @@
+# Default values for demo-app.
+replicaCount: 1
+
+# Echo server that returns pod hostname, request Host and path.
+image: traefik/whoami:v1.10.4
+
+# Logical name surfaced in the whoami banner (via --name).
+appName: demo
+
+# Container/Service port. whoami listens on 80 by default.
+port: 80
+
+# fullnameOverride is set per-release from Terraform so Service names are
+# predictable (app1, shop, api, ...).
+fullnameOverride: ""
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 64Mi

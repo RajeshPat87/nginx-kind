@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars and edit if you want to override defaults.
+# kube_context      = "kind-nginx-kind"
+# domain            = "example.com"
+# enable_monitoring = false
+# pg_user           = "appuser"
+# pg_password       = "apppass123"
+# pg_database       = "appdb"

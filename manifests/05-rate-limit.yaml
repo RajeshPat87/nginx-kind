@@ -1,0 +1,25 @@
+# USE CASE 5: Rate limiting.
+# limit-rps caps requests-per-second per client IP; burst-multiplier keeps the
+# burst allowance small so the limit is easy to trip. Excess requests get 503.
+#   http://ratelimit.example.com -> app1  (capped)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rate-limit
+  namespace: apps
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "2"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "1"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ratelimit.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app1
+                port:
+                  number: 80
