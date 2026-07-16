@@ -5,6 +5,7 @@ module "monitoring" {
   source        = "./modules/monitoring"
   enabled       = var.enable_monitoring
   chart_version = var.monitoring_chart_version
+  grafana_host  = "grafana.${var.domain}"
 }
 
 # MetalLB provides a real LoadBalancer implementation for the HA ingress

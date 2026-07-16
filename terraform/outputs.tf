@@ -35,6 +35,11 @@ output "monitoring_enabled" {
   value = module.monitoring.enabled
 }
 
+output "grafana_url" {
+  description = "Grafana URL via the ingress (resolve the host to the ingress LoadBalancer IP)."
+  value       = module.monitoring.grafana_url
+}
+
 output "next_steps" {
   value = "Run 'make config' (Ansible post-config) then 'make test' to exercise every ingress scenario."
 }

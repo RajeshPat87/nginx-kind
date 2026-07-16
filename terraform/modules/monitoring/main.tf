@@ -32,6 +32,17 @@ resource "helm_release" "monitoring" {
         limits   = { memory = "256Mi" }
       }
       defaultDashboardsTimezone = "browser"
+
+      # Expose Grafana through the nginx ingress controller so it is always
+      # reachable at http://<grafana_host> via the LoadBalancer — no manual
+      # port-forward. Disabled when grafana_host is empty.
+      ingress = {
+        enabled          = var.grafana_host != ""
+        ingressClassName = "nginx"
+        hosts            = var.grafana_host != "" ? [var.grafana_host] : []
+        path             = "/"
+        pathType         = "Prefix"
+      }
     }
 
     prometheus = {
