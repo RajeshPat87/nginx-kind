@@ -43,9 +43,14 @@ variable "ingress_ha_enabled" {
 }
 
 variable "ingress_replica_count" {
-  description = "Controller replicas when ingress_ha_enabled=true. Keep <= worker count (one replica per node)."
+  description = "Controller replicas when ingress_ha_enabled=true. Must be <= the kind node count (3): pod anti-affinity is required-during-scheduling, so extra replicas stay Pending. At 3 one replica lands on the control-plane and keeps localhost:80 reachable."
   type        = number
-  default     = 2
+  default     = 3
+
+  validation {
+    condition     = var.ingress_replica_count >= 1 && var.ingress_replica_count <= 3
+    error_message = "ingress_replica_count must be between 1 and 3 — kind/cluster.yaml defines 3 nodes and anti-affinity allows one controller replica per node."
+  }
 }
 
 variable "metallb_chart_version" {

@@ -8,10 +8,11 @@
 
 # ---- Ingress HA use-case (MetalLB LoadBalancer + multiple replicas) ----
 # Leave false for the default single-replica setup reachable on localhost:80.
-# Set true to demo HA: 2 controller replicas spread across the 2 workers behind
-# a MetalLB LoadBalancer. Access is then via the assigned LB IP, not localhost.
+# Set true to demo HA: one controller replica per node (3) behind a MetalLB
+# LoadBalancer. Reachable on localhost:80 as usual, and additionally on the
+# assigned LB IP (from inside WSL2 only — it is not routable from Windows).
 # ingress_ha_enabled    = false
-# ingress_replica_count = 2
+# ingress_replica_count = 3
 # metallb_chart_version = "0.14.8"
 # Must match the kind Docker network subnet:
 #   docker network inspect kind -f '{{ (index .IPAM.Config 0).Subnet }}'
