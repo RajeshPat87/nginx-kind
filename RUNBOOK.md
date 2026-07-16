@@ -262,6 +262,7 @@ sudo tee -a /etc/hosts >/dev/null <<'EOF'
 127.0.0.1 app.example.com shop.example.com api.example.com blog.example.com
 127.0.0.1 secure.example.com rewrite.example.com ratelimit.example.com
 127.0.0.1 auth.example.com canary.example.com db.example.com
+127.0.0.1 grafana.example.com
 EOF
 ```
 
@@ -281,9 +282,33 @@ make monitoring        # installs trimmed kube-prometheus-stack
 make grafana           # port-forward -> http://localhost:3000  (admin/admin)
 ```
 
+### Grafana via ingress (no port-forward)
+
+Grafana is also exposed through the nginx ingress at **`grafana.example.com`**
+(controlled by the `grafana_host` variable), so it stays reachable without a
+port-forward and survives Grafana pod restarts. `terraform output grafana_url`
+prints the URL.
+
+- **Default (`hostPort`) mode** — add `grafana.example.com` to your hosts file
+  pointing at `127.0.0.1` (same as the app hosts below) and browse
+  `http://grafana.example.com`.
+- **HA mode** — resolve it to the ingress LoadBalancer IP instead:
+  ```bash
+  LB_IP="$(terraform -chdir=terraform output -raw ingress_external_ip)"
+  curl -s -o /dev/null -w "%{http_code}\n" --resolve grafana.example.com:80:$LB_IP http://grafana.example.com/api/health   # 200
+  # WSL2 /etc/hosts for a Linux browser:  echo "$LB_IP grafana.example.com" | sudo tee -a /etc/hosts
+  ```
+  From a Windows browser the LB IP must be routable (WSL2 mirrored networking);
+  otherwise use `make grafana` (port-forward) for Windows.
+
+Prometheus (raw queries / targets) is reachable the same way via port-forward:
+```bash
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090   # http://localhost:9090
+```
+
 In Grafana, the NGINX ingress metrics are scraped automatically (the controller
-exposes a ServiceMonitor once monitoring is enabled). Try the
-**"NGINX Ingress controller"** dashboard or query `nginx_ingress_controller_requests`.
+exposes a ServiceMonitor once monitoring is enabled). Import dashboard **14314**
+(or **9614**) and query `nginx_ingress_controller_requests`.
 
 Check Prometheus targets:
 ```bash
