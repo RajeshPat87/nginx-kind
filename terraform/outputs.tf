@@ -9,6 +9,11 @@ output "ingress_controller_service" {
   value       = "${module.ingress.controller_service} (${module.ingress.controller_service_type})"
 }
 
+output "ingress_external_ip" {
+  description = "MetalLB LoadBalancer IP in HA mode (empty in default mode). Export as INGRESS_IP for the test suite."
+  value       = module.ingress.controller_external_ip
+}
+
 output "apps_namespace" {
   value = module.apps.namespace
 }

@@ -1,0 +1,20 @@
+# MetalLB address pool + L2 advertisement. Applied as a Helm release (after the
+# MetalLB controller and its CRDs/webhook are ready) so there is no plan-time
+# dependency on CRDs that do not exist yet.
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: kind-pool
+  namespace: {{ .Release.Namespace }}
+spec:
+  addresses:
+    - {{ .Values.addressPool | quote }}
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: kind-l2
+  namespace: {{ .Release.Namespace }}
+spec:
+  ipAddressPools:
+    - kind-pool
